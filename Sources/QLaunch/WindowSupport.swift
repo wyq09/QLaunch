@@ -246,3 +246,72 @@ struct ArrowKeyPagingRegistrar: NSViewRepresentable {
         }
     }
 }
+
+struct EscapeKeyRegistrar: NSViewRepresentable {
+    let windowIdentifier: String
+    let onEscape: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(windowIdentifier: windowIdentifier, onEscape: onEscape)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let anchor = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded()
+        }
+        return anchor
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.windowIdentifier = windowIdentifier
+        context.coordinator.onEscape = onEscape
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded()
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var windowIdentifier: String
+        var onEscape: () -> Void
+
+        private var localKeyMonitor: Any?
+
+        init(windowIdentifier: String, onEscape: @escaping () -> Void) {
+            self.windowIdentifier = windowIdentifier
+            self.onEscape = onEscape
+        }
+
+        func installIfNeeded() {
+            guard localKeyMonitor == nil else {
+                return
+            }
+
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else {
+                    return event
+                }
+                return self.handle(event)
+            }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            guard event.keyCode == 53 else { // ESC
+                return event
+            }
+
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers.isEmpty else {
+                return event
+            }
+
+            guard NSApp.keyWindow?.identifier?.rawValue == windowIdentifier else {
+                return event
+            }
+
+            onEscape()
+            return nil
+        }
+    }
+}

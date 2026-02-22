@@ -108,6 +108,13 @@ struct LaunchpadView: View {
                             goToNextPage()
                         }
                     )
+
+                    EscapeKeyRegistrar(
+                        windowIdentifier: WindowConfigurator.launchpadWindowIdentifier,
+                        onEscape: {
+                            minimizeCurrentWindow()
+                        }
+                    )
                 }
                 .allowsHitTesting(false)
             }

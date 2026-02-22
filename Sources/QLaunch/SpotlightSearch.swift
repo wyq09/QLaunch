@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class SpotlightSearchController: ObservableObject {
     static let shared = SpotlightSearchController()
+    static let windowIdentifier = "qlaunch.window.spotlight"
 
     @Published var query = "" {
         didSet {
@@ -18,6 +19,7 @@ final class SpotlightSearchController: ObservableObject {
 
     private var panel: SpotlightPanel?
     private var loadTask: Task<Void, Never>?
+    private var previousFrontmostApplication: NSRunningApplication?
 
     private init() {}
 
@@ -27,7 +29,7 @@ final class SpotlightSearchController: ObservableObject {
 
     func toggle() {
         if panel?.isVisible == true {
-            dismiss()
+            dismiss(restorePreviousApp: true)
         } else {
             show()
         }
@@ -45,21 +47,41 @@ final class SpotlightSearchController: ObservableObject {
             return
         }
 
+        let currentProcessID = ProcessInfo.processInfo.processIdentifier
+        if let frontmost = NSWorkspace.shared.frontmostApplication,
+           frontmost.processIdentifier != currentProcessID {
+            previousFrontmostApplication = frontmost
+        } else {
+            previousFrontmostApplication = nil
+        }
+
         position(panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
     }
 
-    func dismiss() {
+    func dismiss(restorePreviousApp: Bool = false) {
         panel?.orderOut(nil)
+
+        guard restorePreviousApp else {
+            return
+        }
+
+        if let app = previousFrontmostApplication, !app.isTerminated {
+            app.activate(options: [])
+        } else {
+            NSApp.hide(nil)
+        }
+
+        previousFrontmostApplication = nil
     }
 
     func open(_ app: LaunchpadApp) {
         guard LaunchpadAppOpener.open(app) else {
             return
         }
-        dismiss()
+        dismiss(restorePreviousApp: false)
     }
 
     func openCurrentSelection() {
@@ -93,13 +115,13 @@ final class SpotlightSearchController: ObservableObject {
         }
 
         let panel = SpotlightPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 580),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         panel.title = "Spotlight Search"
-        panel.identifier = NSUserInterfaceItemIdentifier("qlaunch.window.spotlight")
+        panel.identifier = NSUserInterfaceItemIdentifier(Self.windowIdentifier)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.titleVisibility = .hidden
@@ -210,41 +232,54 @@ private struct SpotlightSearchView: View {
     }
 
     private let containerCornerRadius: CGFloat = 30
+    private let cardSize = CGSize(width: 760, height: 520)
+    private let panelSize = CGSize(width: 820, height: 580)
 
     var body: some View {
-        VStack(spacing: 0) {
-            searchHeader
+        ZStack {
+            VStack(spacing: 0) {
+                searchHeader
 
-            Divider()
-                .overlay(Color.white.opacity(0.18 * surfaceOpacity))
+                Divider()
+                    .overlay(Color.white.opacity(0.18 * surfaceOpacity))
 
-            resultsList
-        }
-        .frame(width: 760, height: 520)
-        .background {
-            VisualEffectBackdrop(material: .hudWindow, blendingMode: .withinWindow)
-                .opacity(surfaceOpacity)
-                .clipShape(RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.1 * surfaceOpacity),
-                                    Color.white.opacity(0.03 * surfaceOpacity),
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
+                resultsList
+            }
+            .frame(width: cardSize.width, height: cardSize.height)
+            .background {
+                VisualEffectBackdrop(material: .hudWindow, blendingMode: .withinWindow)
+                    .opacity(surfaceOpacity)
+                    .clipShape(RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.1 * surfaceOpacity),
+                                        Color.white.opacity(0.03 * surfaceOpacity),
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
                             )
-                        )
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous)
-                        .stroke(Color.white.opacity(0.26 * surfaceOpacity), lineWidth: 0.9)
-                }
-                .shadow(color: .black.opacity(0.25), radius: 24, y: 14)
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous)
+                            .stroke(Color.white.opacity(0.26 * surfaceOpacity), lineWidth: 0.9)
+                    }
+                    .shadow(color: .black.opacity(0.25), radius: 24, y: 14)
+            }
         }
-        .padding(.horizontal, 12)
+        .frame(width: panelSize.width, height: panelSize.height)
+        .overlay {
+            EscapeKeyRegistrar(
+                windowIdentifier: SpotlightSearchController.windowIdentifier,
+                onEscape: {
+                    controller.dismiss(restorePreviousApp: true)
+                }
+            )
+            .allowsHitTesting(false)
+        }
         .onAppear {
             isSearchFocused = true
         }
@@ -262,7 +297,7 @@ private struct SpotlightSearchView: View {
             }
         }
         .onExitCommand {
-            controller.dismiss()
+            controller.dismiss(restorePreviousApp: true)
         }
     }
 
@@ -272,7 +307,7 @@ private struct SpotlightSearchView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.78))
 
-            TextField("Spotlight Search 应用", text: $controller.query)
+            TextField("搜索应用", text: $controller.query)
                 .textFieldStyle(.plain)
                 .font(.custom("Avenir Next Demi Bold", size: 26))
                 .foregroundStyle(.white)
