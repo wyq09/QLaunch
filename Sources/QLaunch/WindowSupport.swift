@@ -91,6 +91,7 @@ struct SwipeGestureRegistrar: NSViewRepresentable {
         private var localScrollMonitor: Any?
         private var accumulatedDeltaX: CGFloat = 0
         private var accumulatedDeltaY: CGFloat = 0
+        private var lastSwipeUptime: TimeInterval = 0
 
         init(onSwipeLeft: @escaping () -> Void, onSwipeRight: @escaping () -> Void) {
             self.onSwipeLeft = onSwipeLeft
@@ -113,7 +114,8 @@ struct SwipeGestureRegistrar: NSViewRepresentable {
         }
 
         private func handle(_ event: NSEvent) {
-            guard event.phase != [] || event.momentumPhase != [] else {
+            // Ignore momentum-only events to avoid double page turns on a single swipe.
+            guard event.phase != [] else {
                 return
             }
 
@@ -125,7 +127,7 @@ struct SwipeGestureRegistrar: NSViewRepresentable {
             accumulatedDeltaX += event.scrollingDeltaX
             accumulatedDeltaY += event.scrollingDeltaY
 
-            let gestureEnded = event.phase == .ended || event.momentumPhase == .ended || event.phase == .cancelled
+            let gestureEnded = event.phase == .ended || event.phase == .cancelled
             guard gestureEnded else {
                 return
             }
@@ -142,11 +144,100 @@ struct SwipeGestureRegistrar: NSViewRepresentable {
                 return
             }
 
+            let now = ProcessInfo.processInfo.systemUptime
+            guard now - lastSwipeUptime >= 0.24 else {
+                return
+            }
+
             if accumulatedDeltaX < 0 {
                 onSwipeLeft()
             } else {
                 onSwipeRight()
             }
+
+            lastSwipeUptime = now
+        }
+    }
+}
+
+struct ArrowKeyPagingRegistrar: NSViewRepresentable {
+    let onLeftArrow: () -> Void
+    let onRightArrow: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onLeftArrow: onLeftArrow, onRightArrow: onRightArrow)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let anchor = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded()
+        }
+        return anchor
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onLeftArrow = onLeftArrow
+        context.coordinator.onRightArrow = onRightArrow
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded()
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var onLeftArrow: () -> Void
+        var onRightArrow: () -> Void
+
+        private var localKeyMonitor: Any?
+
+        init(onLeftArrow: @escaping () -> Void, onRightArrow: @escaping () -> Void) {
+            self.onLeftArrow = onLeftArrow
+            self.onRightArrow = onRightArrow
+        }
+
+        func installIfNeeded() {
+            guard localKeyMonitor == nil else {
+                return
+            }
+
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else {
+                    return event
+                }
+
+                return self.handle(event)
+            }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            if isEditingText {
+                return event
+            }
+
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers.isEmpty else {
+                return event
+            }
+
+            switch event.keyCode {
+            case 123: // left arrow
+                onLeftArrow()
+                return nil
+            case 124: // right arrow
+                onRightArrow()
+                return nil
+            default:
+                return event
+            }
+        }
+
+        private var isEditingText: Bool {
+            guard let textView = NSApp.keyWindow?.firstResponder as? NSTextView else {
+                return false
+            }
+
+            return textView.isEditable
         }
     }
 }

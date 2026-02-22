@@ -80,29 +80,30 @@ struct LaunchpadView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay {
-                SwipeGestureRegistrar(
-                    onSwipeLeft: {
-                        goToNextPage()
-                    },
-                    onSwipeRight: {
-                        goToPreviousPage()
-                    }
-                )
+                ZStack {
+                    SwipeGestureRegistrar(
+                        onSwipeLeft: {
+                            goToNextPage()
+                        },
+                        onSwipeRight: {
+                            goToPreviousPage()
+                        }
+                    )
+
+                    ArrowKeyPagingRegistrar(
+                        onLeftArrow: {
+                            goToPreviousPage()
+                        },
+                        onRightArrow: {
+                            goToNextPage()
+                        }
+                    )
+                }
                 .allowsHitTesting(false)
             }
             .task {
                 if apps.isEmpty, !isLoadingApps {
                     await loadInstalledApps()
-                }
-            }
-            .onMoveCommand { direction in
-                switch direction {
-                case .left:
-                    goToPreviousPage()
-                case .right:
-                    goToNextPage()
-                default:
-                    break
                 }
             }
             .onExitCommand {
@@ -129,8 +130,10 @@ struct LaunchpadView: View {
 
             LinearGradient(
                 colors: [
-                    Color(red: 0.2, green: 0.28, blue: 0.72).opacity(0.5),
-                    Color(red: 0.24, green: 0.25, blue: 0.58).opacity(0.5),
+                    Color.white.opacity(0.04),
+                    Color.cyan.opacity(0.05),
+                    Color.blue.opacity(0.06),
+                    Color.white.opacity(0.03),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -138,14 +141,25 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.white.opacity(0.22),
+                    Color.white.opacity(0.2),
+                    Color.clear,
+                ],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 520
+            )
+            .offset(x: -220, y: -180)
+
+            RadialGradient(
+                colors: [
+                    Color.blue.opacity(0.12),
                     Color.clear,
                 ],
                 center: .bottomTrailing,
-                startRadius: 0,
-                endRadius: 440
+                startRadius: 10,
+                endRadius: 460
             )
-            .offset(x: 160, y: 150)
+            .offset(x: 140, y: 180)
         }
     }
 
@@ -383,8 +397,7 @@ struct LaunchpadView: View {
                     launch(app)
                 }
                 .onDrag {
-                    draggingAppID = app.id
-                    return NSItemProvider(object: app.id as NSString)
+                    dragProvider(for: app.id)
                 }
                 .onDrop(of: [UTType.text], delegate: LaunchpadItemDropDelegate(
                     target: .app(app.id),
@@ -655,6 +668,17 @@ struct LaunchpadView: View {
         return false
     }
 
+    private func dragProvider(for appID: String) -> NSItemProvider {
+        // Require a physical primary-button drag to reduce accidental multi-touch drags.
+        guard (NSEvent.pressedMouseButtons & 1) == 1 else {
+            draggingAppID = nil
+            return NSItemProvider()
+        }
+
+        draggingAppID = appID
+        return NSItemProvider(object: appID as NSString)
+    }
+
     private func handleDrop(sourceAppID: String, target: LaunchpadDropTarget) {
         guard normalizedQuery.isEmpty else {
             return
@@ -813,8 +837,6 @@ private struct SlidingPager<PageContent: View>: View {
     @Binding var currentPage: Int
     let content: (Int) -> PageContent
 
-    @GestureState private var dragOffset: CGFloat = 0
-
     var body: some View {
         GeometryReader { proxy in
             HStack(spacing: 0) {
@@ -823,29 +845,8 @@ private struct SlidingPager<PageContent: View>: View {
                         .frame(width: proxy.size.width, height: proxy.size.height)
                 }
             }
-            .offset(x: -CGFloat(currentPage) * proxy.size.width + dragOffset)
+            .offset(x: -CGFloat(currentPage) * proxy.size.width)
             .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.88), value: currentPage)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 10)
-                    .updating($dragOffset) { value, state, _ in
-                        state = value.translation.width
-                    }
-                    .onEnded { value in
-                        guard pageCount > 1 else {
-                            return
-                        }
-
-                        let threshold = proxy.size.width * 0.16
-                        let predicted = value.predictedEndTranslation.width
-
-                        if predicted < -threshold {
-                            currentPage = min(currentPage + 1, pageCount - 1)
-                        } else if predicted > threshold {
-                            currentPage = max(currentPage - 1, 0)
-                        }
-                    }
-            )
             .clipped()
         }
     }
@@ -969,6 +970,17 @@ private struct FolderOverlayView: View {
         folder.appIDs.compactMap { appsByID[$0] }
     }
 
+    private func dragProvider(for appID: String) -> NSItemProvider {
+        // Require a physical primary-button drag to reduce accidental multi-touch drags.
+        guard (NSEvent.pressedMouseButtons & 1) == 1 else {
+            draggingAppID = nil
+            return NSItemProvider()
+        }
+
+        draggingAppID = appID
+        return NSItemProvider(object: appID as NSString)
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.34)
@@ -1029,8 +1041,7 @@ private struct FolderOverlayView: View {
                             openApp(app)
                         }
                         .onDrag {
-                            draggingAppID = app.id
-                            return NSItemProvider(object: app.id as NSString)
+                            dragProvider(for: app.id)
                         }
                     }
                 }
