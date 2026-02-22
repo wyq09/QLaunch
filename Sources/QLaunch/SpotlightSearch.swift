@@ -94,7 +94,7 @@ final class SpotlightSearchController: ObservableObject {
 
         let panel = SpotlightPanel(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
-            styleMask: [.titled, .nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -209,6 +209,8 @@ private struct SpotlightSearchView: View {
         Array(controller.filteredApps.prefix(16))
     }
 
+    private let containerCornerRadius: CGFloat = 30
+
     var body: some View {
         VStack(spacing: 0) {
             searchHeader
@@ -222,9 +224,9 @@ private struct SpotlightSearchView: View {
         .background {
             VisualEffectBackdrop(material: .hudWindow, blendingMode: .withinWindow)
                 .opacity(surfaceOpacity)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -237,7 +239,7 @@ private struct SpotlightSearchView: View {
                         )
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: containerCornerRadius, style: .continuous)
                         .stroke(Color.white.opacity(0.26 * surfaceOpacity), lineWidth: 0.9)
                 }
                 .shadow(color: .black.opacity(0.25), radius: 24, y: 14)
