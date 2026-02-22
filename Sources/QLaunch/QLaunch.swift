@@ -105,6 +105,9 @@ struct LaunchpadView: View {
                     break
                 }
             }
+            .onExitCommand {
+                minimizeCurrentWindow()
+            }
             .onChange(of: query) { _, _ in
                 currentPage = 0
                 if !normalizedQuery.isEmpty {
@@ -467,6 +470,22 @@ struct LaunchpadView: View {
 
         withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.88)) {
             currentPage -= 1
+        }
+    }
+
+    private func minimizeCurrentWindow() {
+        if let keyWindow = NSApp.keyWindow {
+            keyWindow.miniaturize(nil)
+            return
+        }
+
+        if let mainWindow = NSApp.mainWindow {
+            mainWindow.miniaturize(nil)
+            return
+        }
+
+        for window in NSApp.windows where window.isVisible {
+            window.miniaturize(nil)
         }
     }
 
