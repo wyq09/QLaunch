@@ -39,7 +39,7 @@ struct WindowConfigurator: NSViewRepresentable {
             window.backgroundColor = .clear
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
-            window.isMovableByWindowBackground = true
+            window.isMovableByWindowBackground = false
             window.hasShadow = true
 
             let windowID = ObjectIdentifier(window)

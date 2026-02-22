@@ -21,6 +21,7 @@ struct QLaunchApp: App {
 struct LaunchpadView: View {
     private let githubURL = URL(string: "https://github.com/wyq09/QLaunch")!
     @ObservedObject private var hotKeyStore = HotKeySettingsStore.shared
+    @ObservedObject private var appearanceStore = AppearanceSettingsStore.shared
 
     @State private var query = ""
     @State private var apps: [LaunchpadApp] = []
@@ -35,6 +36,7 @@ struct LaunchpadView: View {
     @State private var isLoadingApps = false
     @State private var loadingError: String?
     @State private var showHotKeyEditor = false
+    @State private var showAppearanceEditor = false
 
     private var appByID: [String: LaunchpadApp] {
         Dictionary(uniqueKeysWithValues: apps.map { ($0.id, $0) })
@@ -63,6 +65,14 @@ struct LaunchpadView: View {
 
     private var pageCount: Int {
         max(pagedItems.count, 1)
+    }
+
+    private var surfaceOpacity: Double {
+        appearanceStore.surfaceOpacity
+    }
+
+    private var surfaceOpacityPercent: Int {
+        Int((surfaceOpacity * 100).rounded())
     }
 
     var body: some View {
@@ -130,10 +140,10 @@ struct LaunchpadView: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.07),
-                    Color.white.opacity(0.04),
-                    Color.cyan.opacity(0.035),
-                    Color.blue.opacity(0.035),
+                    Color.white.opacity(0.07 * surfaceOpacity),
+                    Color.white.opacity(0.04 * surfaceOpacity),
+                    Color.cyan.opacity(0.035 * surfaceOpacity),
+                    Color.blue.opacity(0.035 * surfaceOpacity),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -141,7 +151,7 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.white.opacity(0.22),
+                    Color.white.opacity(0.22 * surfaceOpacity),
                     Color.clear,
                 ],
                 center: .topLeading,
@@ -152,7 +162,7 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.cyan.opacity(0.08),
+                    Color.cyan.opacity(0.08 * surfaceOpacity),
                     Color.clear,
                 ],
                 center: .bottomTrailing,
@@ -178,14 +188,15 @@ struct LaunchpadView: View {
         .frame(width: shellSize.width, height: shellSize.height)
         .background {
             VisualEffectBackdrop(material: .windowBackground, blendingMode: .withinWindow)
+                .opacity(surfaceOpacity)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.12),
-                                    Color.white.opacity(0.035),
+                                    Color.white.opacity(0.12 * surfaceOpacity),
+                                    Color.white.opacity(0.035 * surfaceOpacity),
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -194,7 +205,7 @@ struct LaunchpadView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.white.opacity(0.22), lineWidth: 0.9)
+                        .stroke(Color.white.opacity(0.24 * surfaceOpacity), lineWidth: 0.9)
                 }
         }
         .overlay(alignment: .bottom) {
@@ -236,7 +247,10 @@ struct LaunchpadView: View {
     private var topBar: some View {
         VStack(spacing: 9) {
             HStack {
-                hotKeyButton
+                HStack(spacing: 8) {
+                    hotKeyButton
+                    opacityButton
+                }
 
                 Spacer(minLength: 12)
 
@@ -264,6 +278,14 @@ struct LaunchpadView: View {
                 Spacer(minLength: 0)
 
                 Text("全局热键：\(hotKeyStore.configuration.displayText)")
+                    .font(.custom("Avenir Next Medium", size: 12))
+                    .foregroundStyle(.white.opacity(0.64))
+
+                Text("·")
+                    .font(.custom("Avenir Next Medium", size: 12))
+                    .foregroundStyle(.white.opacity(0.5))
+
+                Text("透明度：\(surfaceOpacityPercent)%")
                     .font(.custom("Avenir Next Medium", size: 12))
                     .foregroundStyle(.white.opacity(0.64))
 
@@ -314,6 +336,38 @@ struct LaunchpadView: View {
         }
     }
 
+    private var opacityButton: some View {
+        Button {
+            showAppearanceEditor = true
+        } label: {
+            Text("透明度")
+                .font(.custom("Avenir Next Demi Bold", size: 12))
+                .foregroundStyle(.white.opacity(0.92))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.12 * surfaceOpacity))
+                        .overlay {
+                            Capsule()
+                                .stroke(Color.white.opacity(0.2 * surfaceOpacity), lineWidth: 0.8)
+                        }
+                )
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showAppearanceEditor, arrowEdge: .bottom) {
+            AppearanceEditorView(
+                opacity: surfaceOpacity,
+                update: { newOpacity in
+                    appearanceStore.update(opacity: newOpacity)
+                },
+                reset: {
+                    appearanceStore.reset()
+                }
+            )
+        }
+    }
+
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
@@ -329,14 +383,15 @@ struct LaunchpadView: View {
         .frame(height: 40)
         .background {
             VisualEffectBackdrop(material: .sidebar, blendingMode: .withinWindow)
+                .opacity(surfaceOpacity)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.09),
-                                    Color.white.opacity(0.03),
+                                    Color.white.opacity(0.09 * surfaceOpacity),
+                                    Color.white.opacity(0.03 * surfaceOpacity),
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -345,7 +400,7 @@ struct LaunchpadView: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.26), lineWidth: 0.8)
+                        .stroke(Color.white.opacity(0.28 * surfaceOpacity), lineWidth: 0.8)
                 }
         }
     }
@@ -706,15 +761,19 @@ struct LaunchpadView: View {
             return
         }
 
-        switch target {
-        case .app(let targetAppID):
-            groupApps(sourceAppID: sourceAppID, targetAppID: targetAppID)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            switch target {
+            case .app(let targetAppID):
+                groupApps(sourceAppID: sourceAppID, targetAppID: targetAppID)
 
-        case .folder(let folderID):
-            moveApp(sourceAppID: sourceAppID, intoFolder: folderID)
+            case .folder(let folderID):
+                moveApp(sourceAppID: sourceAppID, intoFolder: folderID)
 
-        case .folderExtraction(let folderID):
-            extractApp(sourceAppID: sourceAppID, fromFolder: folderID)
+            case .folderExtraction(let folderID):
+                extractApp(sourceAppID: sourceAppID, fromFolder: folderID)
+            }
         }
 
         clampCurrentPage()
@@ -743,7 +802,6 @@ struct LaunchpadView: View {
 
         let folder = LaunchpadFolder(name: "新建文件夹", appIDs: uniquePreservingOrder([targetAppID, sourceAppID]))
         layoutItems.insert(.folder(folder), at: insertIndex)
-        activeFolderID = folder.id
     }
 
     private func moveApp(sourceAppID: String, intoFolder folderID: UUID) {
@@ -1164,6 +1222,60 @@ private struct HotKeyEditorView: View {
                     save(draft.normalized)
                 }
                 .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+        .frame(width: 320)
+    }
+}
+
+private struct AppearanceEditorView: View {
+    @State private var draftOpacity: Double
+    let update: (Double) -> Void
+    let reset: () -> Void
+
+    init(opacity: Double, update: @escaping (Double) -> Void, reset: @escaping () -> Void) {
+        _draftOpacity = State(initialValue: opacity)
+        self.update = update
+        self.reset = reset
+    }
+
+    private var opacityPercent: Int {
+        Int((draftOpacity * 100).rounded())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("界面透明度")
+                .font(.custom("Avenir Next Demi Bold", size: 16))
+
+            Text("拖动滑杆调整玻璃层透明度")
+                .font(.custom("Avenir Next Medium", size: 12))
+                .foregroundStyle(.secondary)
+
+            HStack {
+                Slider(
+                    value: $draftOpacity,
+                    in: AppearanceSettingsStore.minOpacity...AppearanceSettingsStore.maxOpacity,
+                    step: 0.01
+                )
+                .onChange(of: draftOpacity) { _, newValue in
+                    update(newValue)
+                }
+
+                Text("\(opacityPercent)%")
+                    .font(.custom("Avenir Next Medium", size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 48, alignment: .trailing)
+            }
+
+            HStack {
+                Button("恢复默认") {
+                    draftOpacity = AppearanceSettingsStore.defaultOpacity
+                    reset()
+                }
+
+                Spacer(minLength: 0)
             }
         }
         .padding(16)
