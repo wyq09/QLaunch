@@ -130,10 +130,10 @@ struct LaunchpadView: View {
 
             LinearGradient(
                 colors: [
+                    Color.white.opacity(0.07),
                     Color.white.opacity(0.04),
-                    Color.cyan.opacity(0.05),
-                    Color.blue.opacity(0.06),
-                    Color.white.opacity(0.03),
+                    Color.cyan.opacity(0.035),
+                    Color.blue.opacity(0.035),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -141,7 +141,7 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.white.opacity(0.2),
+                    Color.white.opacity(0.22),
                     Color.clear,
                 ],
                 center: .topLeading,
@@ -152,7 +152,7 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.blue.opacity(0.12),
+                    Color.cyan.opacity(0.08),
                     Color.clear,
                 ],
                 center: .bottomTrailing,
@@ -177,15 +177,24 @@ struct LaunchpadView: View {
         .padding(.bottom, 20)
         .frame(width: shellSize.width, height: shellSize.height)
         .background {
-            VisualEffectBackdrop(material: .hudWindow, blendingMode: .withinWindow)
+            VisualEffectBackdrop(material: .windowBackground, blendingMode: .withinWindow)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(Color.white.opacity(0.03))
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.12),
+                                    Color.white.opacity(0.035),
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.white.opacity(0.16), lineWidth: 0.8)
+                        .stroke(Color.white.opacity(0.22), lineWidth: 0.9)
                 }
         }
         .overlay(alignment: .bottom) {
@@ -319,11 +328,24 @@ struct LaunchpadView: View {
         .padding(.horizontal, 16)
         .frame(height: 40)
         .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(red: 0.08, green: 0.15, blue: 0.37).opacity(0.72))
+            VisualEffectBackdrop(material: .sidebar, blendingMode: .withinWindow)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.09),
+                                    Color.white.opacity(0.03),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(0.26), lineWidth: 0.8)
                 }
         }
     }
