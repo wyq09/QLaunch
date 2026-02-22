@@ -21,6 +21,8 @@ struct VisualEffectBackdrop: NSViewRepresentable {
 }
 
 struct WindowConfigurator: NSViewRepresentable {
+    static let launchpadWindowIdentifier = "qlaunch.window.launchpad"
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -41,6 +43,9 @@ struct WindowConfigurator: NSViewRepresentable {
             window.styleMask.insert(.fullSizeContentView)
             window.isMovableByWindowBackground = false
             window.hasShadow = true
+            if window.identifier == nil {
+                window.identifier = NSUserInterfaceItemIdentifier(Self.launchpadWindowIdentifier)
+            }
 
             let windowID = ObjectIdentifier(window)
             if !context.coordinator.didConfigureWindowIDs.contains(windowID) {

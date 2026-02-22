@@ -8,12 +8,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        hotKeyManager.register(configuration: HotKeySettingsStore.shared.configuration)
+        registerHotKeys(HotKeySettingsStore.shared.settings)
 
-        hotKeyObserver = HotKeySettingsStore.shared.$configuration
+        hotKeyObserver = HotKeySettingsStore.shared.$settings
             .removeDuplicates()
-            .sink { [weak self] configuration in
-                self?.hotKeyManager.register(configuration: configuration)
+            .sink { [weak self] settings in
+                self?.registerHotKeys(settings)
             }
     }
 
@@ -27,18 +27,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return true
         }
 
-        sender.windows.first?.makeKeyAndOrderFront(nil)
+        showLaunchpadWindow()
         return true
+    }
+
+    private func registerHotKeys(_ settings: HotKeySettings) {
+        hotKeyManager.register(
+            settings: settings,
+            onLaunchpad: { [weak self] in
+                self?.showLaunchpadWindow()
+            },
+            onSpotlight: {
+                SpotlightSearchController.shared.toggle()
+            }
+        )
+    }
+
+    private func showLaunchpadWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+
+        if let launchpadWindow = NSApp.windows.first(where: { $0.identifier?.rawValue == WindowConfigurator.launchpadWindowIdentifier }) {
+            if launchpadWindow.isMiniaturized {
+                launchpadWindow.deminiaturize(nil)
+            }
+            launchpadWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        if let firstWindow = NSApp.windows.first {
+            if firstWindow.isMiniaturized {
+                firstWindow.deminiaturize(nil)
+            }
+            firstWindow.makeKeyAndOrderFront(nil)
+        }
     }
 }
 
 @MainActor
 final class GlobalHotKeyManager {
-    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyRefs: [UInt32: EventHotKeyRef] = [:]
     private var eventHandlerRef: EventHandlerRef?
 
-    private let signature: OSType = 0x4D434C48 // 'MCLH'
-    private let hotKeyID: UInt32 = 1
+    private let signature: OSType = 0x514C484B // 'QLHK'
+
+    private let launchpadHotKeyID: UInt32 = 1
+    private let spotlightHotKeyID: UInt32 = 2
+
+    private var onLaunchpad: () -> Void = {}
+    private var onSpotlight: () -> Void = {}
 
     private static let hotKeyHandler: EventHandlerUPP = { _, event, userData in
         guard let userData else {
@@ -49,13 +85,11 @@ final class GlobalHotKeyManager {
         return manager.handleHotKey(event)
     }
 
-    func register(configuration: HotKeyConfiguration) {
+    func register(settings: HotKeySettings, onLaunchpad: @escaping () -> Void, onSpotlight: @escaping () -> Void) {
         unregister()
 
-        let normalized = configuration.normalized
-        guard let keyCode = Self.keyCode(for: normalized.key) else {
-            return
-        }
+        self.onLaunchpad = onLaunchpad
+        self.onSpotlight = onSpotlight
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -77,8 +111,38 @@ final class GlobalHotKeyManager {
             return
         }
 
-        let carbonHotKeyID = EventHotKeyID(signature: signature, id: hotKeyID)
+        let normalizedSettings = settings.normalized
+        let launchpadRegistered = registerHotKey(configuration: normalizedSettings.launchpad, id: launchpadHotKeyID)
+        let spotlightRegistered = registerHotKey(configuration: normalizedSettings.spotlight, id: spotlightHotKeyID)
+
+        if !launchpadRegistered && !spotlightRegistered {
+            unregister()
+        }
+    }
+
+    func unregister() {
+        for (_, hotKeyRef) in hotKeyRefs {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        hotKeyRefs.removeAll(keepingCapacity: true)
+
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
+            self.eventHandlerRef = nil
+        }
+    }
+
+    private func registerHotKey(configuration: HotKeyConfiguration, id: UInt32) -> Bool {
+        let normalized = configuration.normalized
+        guard let keyCode = Self.keyCode(for: normalized.key) else {
+            return false
+        }
+
+        let carbonHotKeyID = EventHotKeyID(signature: signature, id: id)
         let modifiers = Self.carbonModifiers(for: normalized)
+        let dispatcherTarget = GetEventDispatcherTarget()
+
+        var hotKeyRef: EventHotKeyRef?
         let registerStatus = RegisterEventHotKey(
             keyCode,
             modifiers,
@@ -88,22 +152,12 @@ final class GlobalHotKeyManager {
             &hotKeyRef
         )
 
-        guard registerStatus == noErr else {
-            unregister()
-            return
-        }
-    }
-
-    func unregister() {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
+        guard registerStatus == noErr, let hotKeyRef else {
+            return false
         }
 
-        if let eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-            self.eventHandlerRef = nil
-        }
+        hotKeyRefs[id] = hotKeyRef
+        return true
     }
 
     private func handleHotKey(_ event: EventRef?) -> OSStatus {
@@ -122,18 +176,17 @@ final class GlobalHotKeyManager {
             return status
         }
 
-        guard pressedHotKeyID.signature == signature, pressedHotKeyID.id == hotKeyID else {
+        guard pressedHotKeyID.signature == signature else {
             return noErr
         }
 
-        NSApp.activate(ignoringOtherApps: true)
-
-        if let window = NSApp.windows.first {
-            if window.isMiniaturized {
-                window.deminiaturize(nil)
-            }
-
-            window.makeKeyAndOrderFront(nil)
+        switch pressedHotKeyID.id {
+        case launchpadHotKeyID:
+            onLaunchpad()
+        case spotlightHotKeyID:
+            onSpotlight()
+        default:
+            break
         }
 
         return noErr

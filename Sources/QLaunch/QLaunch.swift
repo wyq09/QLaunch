@@ -277,7 +277,15 @@ struct LaunchpadView: View {
             HStack {
                 Spacer(minLength: 0)
 
-                Text("全局热键：\(hotKeyStore.configuration.displayText)")
+                Text("启动台：\(hotKeyStore.settings.launchpad.displayText)")
+                    .font(.custom("Avenir Next Medium", size: 12))
+                    .foregroundStyle(.white.opacity(0.64))
+
+                Text("·")
+                    .font(.custom("Avenir Next Medium", size: 12))
+                    .foregroundStyle(.white.opacity(0.5))
+
+                Text("Spotlight Search：\(hotKeyStore.settings.spotlight.displayText)")
                     .font(.custom("Avenir Next Medium", size: 12))
                     .foregroundStyle(.white.opacity(0.64))
 
@@ -321,14 +329,14 @@ struct LaunchpadView: View {
         .buttonStyle(.plain)
         .popover(isPresented: $showHotKeyEditor, arrowEdge: .bottom) {
             HotKeyEditorView(
-                configuration: hotKeyStore.configuration,
-                save: { newConfiguration in
-                    hotKeyStore.update(configuration: newConfiguration)
+                settings: hotKeyStore.settings,
+                save: { newSettings in
+                    hotKeyStore.update(settings: newSettings)
                     showHotKeyEditor = false
-                    showToast("已更新热键：\(newConfiguration.normalized.displayText)")
+                    showToast("已更新热键设置")
                 },
                 reset: {
-                    hotKeyStore.update(configuration: .defaultValue)
+                    hotKeyStore.reset()
                     showHotKeyEditor = false
                     showToast("已恢复默认热键")
                 }
@@ -1167,14 +1175,18 @@ private struct FolderOverlayView: View {
 }
 
 private struct HotKeyEditorView: View {
-    @State private var draft: HotKeyConfiguration
-    let save: (HotKeyConfiguration) -> Void
+    @State private var draft: HotKeySettings
+    let save: (HotKeySettings) -> Void
     let reset: () -> Void
 
-    init(configuration: HotKeyConfiguration, save: @escaping (HotKeyConfiguration) -> Void, reset: @escaping () -> Void) {
-        _draft = State(initialValue: configuration)
+    init(settings: HotKeySettings, save: @escaping (HotKeySettings) -> Void, reset: @escaping () -> Void) {
+        _draft = State(initialValue: settings)
         self.save = save
         self.reset = reset
+    }
+
+    private var normalized: HotKeySettings {
+        draft.normalized
     }
 
     var body: some View {
@@ -1182,9 +1194,53 @@ private struct HotKeyEditorView: View {
             Text("自定义全局热键")
                 .font(.custom("Avenir Next Demi Bold", size: 16))
 
-            Text("支持 A-Z / 0-9 单键，修饰键可自由组合")
+            Text("支持 A-Z / 0-9 单键，修饰键可自由组合（启动台与 Spotlight 不可重复）")
                 .font(.custom("Avenir Next Medium", size: 12))
                 .foregroundStyle(.secondary)
+
+            HotKeyConfigurationEditor(
+                title: "启动台热键",
+                draft: $draft.launchpad
+            )
+
+            HotKeyConfigurationEditor(
+                title: "Spotlight Search 热键",
+                draft: $draft.spotlight
+            )
+
+            if normalized.hasConflict {
+                Text("两个热键组合不能相同")
+                    .font(.custom("Avenir Next Medium", size: 12))
+                    .foregroundStyle(.red)
+            }
+
+            HStack {
+                Button("恢复默认") {
+                    reset()
+                }
+
+                Spacer(minLength: 0)
+
+                Button("保存") {
+                    save(normalized)
+                }
+                .disabled(normalized.hasConflict)
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+        .frame(width: 360)
+    }
+}
+
+private struct HotKeyConfigurationEditor: View {
+    let title: String
+    @Binding var draft: HotKeyConfiguration
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.custom("Avenir Next Demi Bold", size: 13))
 
             HStack(spacing: 8) {
                 Toggle("⌃", isOn: $draft.control)
@@ -1210,22 +1266,8 @@ private struct HotKeyEditorView: View {
                     .font(.custom("Avenir Next Medium", size: 12))
                     .foregroundStyle(.secondary)
             }
-
-            HStack {
-                Button("恢复默认") {
-                    reset()
-                }
-
-                Spacer(minLength: 0)
-
-                Button("保存") {
-                    save(draft.normalized)
-                }
-                .keyboardShortcut(.defaultAction)
-            }
         }
-        .padding(16)
-        .frame(width: 320)
+        .padding(.vertical, 4)
     }
 }
 
