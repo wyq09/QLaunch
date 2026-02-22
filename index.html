@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Liquid Glass Launchpad</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="ambient-layer" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+    </div>
+
+    <div class="launchpad-shell" id="launchpad-shell">
+      <header class="top-bar">
+        <p class="top-title">Launchpad</p>
+        <p class="top-subtitle">Liquid Glass</p>
+      </header>
+
+      <section class="search-wrap" aria-label="App 搜索">
+        <label class="search-field" for="search-input">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M21 21l-4.3-4.3m0 0A7 7 0 1 0 6.8 6.8a7 7 0 0 0 9.9 9.9z"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.75"
+            ></path>
+          </svg>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="搜索 App"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </label>
+      </section>
+
+      <main id="app-grid" class="app-grid" aria-live="polite"></main>
+
+      <footer class="bottom-bar">
+        <div class="dot-nav" id="dot-nav" aria-label="分页"></div>
+        <button class="mode-toggle" id="mode-toggle" type="button">编辑模式</button>
+      </footer>
+    </div>
+
+    <template id="app-card-template">
+      <button class="app-item" type="button">
+        <span class="app-icon" aria-hidden="true"></span>
+        <span class="app-label"></span>
+      </button>
+    </template>
+
+    <script src="launchpad-core.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
