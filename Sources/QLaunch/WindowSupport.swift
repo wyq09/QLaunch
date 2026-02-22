@@ -315,3 +315,84 @@ struct EscapeKeyRegistrar: NSViewRepresentable {
         }
     }
 }
+
+struct VerticalArrowKeyRegistrar: NSViewRepresentable {
+    let windowIdentifier: String
+    let onArrowUp: () -> Void
+    let onArrowDown: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            windowIdentifier: windowIdentifier,
+            onArrowUp: onArrowUp,
+            onArrowDown: onArrowDown
+        )
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let anchor = NSView(frame: .zero)
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded()
+        }
+        return anchor
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.windowIdentifier = windowIdentifier
+        context.coordinator.onArrowUp = onArrowUp
+        context.coordinator.onArrowDown = onArrowDown
+        DispatchQueue.main.async {
+            context.coordinator.installIfNeeded()
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var windowIdentifier: String
+        var onArrowUp: () -> Void
+        var onArrowDown: () -> Void
+
+        private var localKeyMonitor: Any?
+
+        init(windowIdentifier: String, onArrowUp: @escaping () -> Void, onArrowDown: @escaping () -> Void) {
+            self.windowIdentifier = windowIdentifier
+            self.onArrowUp = onArrowUp
+            self.onArrowDown = onArrowDown
+        }
+
+        func installIfNeeded() {
+            guard localKeyMonitor == nil else {
+                return
+            }
+
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else {
+                    return event
+                }
+                return self.handle(event)
+            }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            guard modifiers.isEmpty else {
+                return event
+            }
+
+            guard NSApp.keyWindow?.identifier?.rawValue == windowIdentifier else {
+                return event
+            }
+
+            switch event.keyCode {
+            case 126: // up arrow
+                onArrowUp()
+                return nil
+            case 125: // down arrow
+                onArrowDown()
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+}

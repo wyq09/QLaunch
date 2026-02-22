@@ -5,7 +5,7 @@ final class AppearanceSettingsStore: ObservableObject {
     static let shared = AppearanceSettingsStore()
 
     static let storageKey = "qlaunch.appearance.surfaceOpacity"
-    static let minOpacity = 0.35
+    static let minOpacity = 0.10
     static let maxOpacity = 1.0
     static let defaultOpacity = 0.82
 

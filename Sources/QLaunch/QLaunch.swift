@@ -75,6 +75,10 @@ struct LaunchpadView: View {
         Int((surfaceOpacity * 100).rounded())
     }
 
+    private var shellGlassOpacity: Double {
+        min(1.0, max(0.18, 0.82 * surfaceOpacity + 0.1))
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let shellSize = CGSize(
@@ -143,14 +147,14 @@ struct LaunchpadView: View {
 
     private var backgroundLayer: some View {
         ZStack {
-            VisualEffectBackdrop(material: .underWindowBackground, blendingMode: .behindWindow)
+            VisualEffectBackdrop(material: .underPageBackground, blendingMode: .behindWindow)
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.07 * surfaceOpacity),
-                    Color.white.opacity(0.04 * surfaceOpacity),
-                    Color.cyan.opacity(0.035 * surfaceOpacity),
-                    Color.blue.opacity(0.035 * surfaceOpacity),
+                    Color(red: 0.88, green: 0.95, blue: 1.0).opacity(0.14 * surfaceOpacity),
+                    Color(red: 0.66, green: 0.84, blue: 1.0).opacity(0.12 * surfaceOpacity),
+                    Color(red: 0.47, green: 0.73, blue: 1.0).opacity(0.10 * surfaceOpacity),
+                    Color(red: 0.37, green: 0.56, blue: 0.98).opacity(0.08 * surfaceOpacity),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -158,7 +162,8 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.white.opacity(0.22 * surfaceOpacity),
+                    Color.white.opacity(0.28 * surfaceOpacity),
+                    Color(red: 0.78, green: 0.92, blue: 1.0).opacity(0.14 * surfaceOpacity),
                     Color.clear,
                 ],
                 center: .topLeading,
@@ -169,12 +174,13 @@ struct LaunchpadView: View {
 
             RadialGradient(
                 colors: [
-                    Color.cyan.opacity(0.08 * surfaceOpacity),
+                    Color(red: 0.38, green: 0.86, blue: 1.0).opacity(0.14 * surfaceOpacity),
+                    Color(red: 0.44, green: 0.58, blue: 1.0).opacity(0.08 * surfaceOpacity),
                     Color.clear,
                 ],
                 center: .bottomTrailing,
                 startRadius: 10,
-                endRadius: 460
+                endRadius: 520
             )
             .offset(x: 140, y: 180)
         }
@@ -194,25 +200,22 @@ struct LaunchpadView: View {
         .padding(.bottom, 20)
         .frame(width: shellSize.width, height: shellSize.height)
         .background {
-            VisualEffectBackdrop(material: .windowBackground, blendingMode: .withinWindow)
-                .opacity(surfaceOpacity)
+            VisualEffectBackdrop(material: .underPageBackground, blendingMode: .withinWindow)
+                .opacity(shellGlassOpacity)
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.12 * surfaceOpacity),
-                                    Color.white.opacity(0.035 * surfaceOpacity),
+                                    Color.white.opacity(0.10 * surfaceOpacity),
+                                    Color(red: 0.77, green: 0.9, blue: 1.0).opacity(0.08 * surfaceOpacity),
+                                    Color(red: 0.56, green: 0.76, blue: 1.0).opacity(0.05 * surfaceOpacity),
                                 ],
-                                startPoint: .top,
-                                endPoint: .bottom
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
                         )
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.white.opacity(0.24 * surfaceOpacity), lineWidth: 0.9)
                 }
         }
         .overlay(alignment: .bottom) {
@@ -393,6 +396,20 @@ struct LaunchpadView: View {
                 .textFieldStyle(.plain)
                 .font(.custom("Avenir Next Medium", size: 17))
                 .foregroundStyle(.white)
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.56))
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.delete, modifiers: [.command])
+                .help("清空搜索")
+            }
         }
         .padding(.horizontal, 16)
         .frame(height: 40)
